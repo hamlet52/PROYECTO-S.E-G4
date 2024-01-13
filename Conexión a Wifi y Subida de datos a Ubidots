@@ -1,0 +1,51 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <UbidotsEsp32Mqtt.h> //Añadir esta librería 
+
+#define WIFISSID "ESP32" //nombre de la red wifi a la que se conectará la esp32
+#define PASSWORD "123456789555"//contraseña de la red wifi a la que se conectará la esp32
+#define TOKEN "BBUS-Rsz8zXqeSRnsp2F0nnSVKEmnfSluKb"
+#define MQTT_CLIENT_NAME "SOLAR_TRACKER"
+#define VARIABLE_LABEL "Bateria"
+#define DEVICE_LABEL "ESP32"
+const int PUBLISH_FREQUENCY = 5000; // Update rate in milliseconds
+
+unsigned long timer;
+
+Ubidots ubidots("BBUS-Rsz8zXqeSRnsp2F0nnSVKEmnfSluKb");
+// LDRS
+const int batteryLevel= 25; 
+
+// VARIABLES DONDE GUARDAR LOS VALORES ADC DEl NIVEL DE BATERIA
+int valorBattery;
+
+
+void setup()
+{
+  Serial.begin(9600);
+  // ubidots.setDebug(true);  // uncomment this to make debug messages available
+  ubidots.connectToWifi(WIFISSID, PASSWORD);
+  ubidots.setup();
+  ubidots.reconnect();
+
+  timer = millis();
+  
+}
+
+void loop()
+{
+  if (!ubidots.connected()){
+    ubidots.reconnect();
+  }
+  valorBattery = analogRead(batteryLevel);
+  valorBattery = valorBattery*0.025; // PARA OBTENER LOS VALORES DEL 0 AL 100
+  // Se coloca limite superior igual a 100
+  if(valorBatteryT>100){
+    valorBattery = 100;
+  }
+  ubidots.add(VARIABLE_LABEL, valorBattery); // Insert your variable Labels and the value to be sent
+  ubidots.publish(DEVICE_LABEL);
+  timer = millis();
+  delay(1000);
+}
+ 
