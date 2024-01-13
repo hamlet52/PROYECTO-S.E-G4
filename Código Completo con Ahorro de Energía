@@ -1,0 +1,178 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <WiFi.h>
+#include <UbidotsEsp32Mqtt.h>
+#include <CheapStepper.h>
+#define PRO_CPU 0
+#define APP_CPU 1
+#define NOAFF_CPU tskNO_AFFINITY
+//Conexión a wifi y subida e datos a Ubidots
+#define WIFISSID "ESP32" //nombre de la red wifi a la que se conectará la esp32
+#define PASSWORD "123456789555"//contraseña de la red wifi a la que se conectará la esp32
+#define TOKEN "BBUS-Rsz8zXqeSRnsp2F0nnSVKEmnfSluKb"
+#define MQTT_CLIENT_NAME "SOLAR_TRACKER"
+#define VARIABLE_LABEL "Bateria"
+#define DEVICE_LABEL "ESP32"
+const int PUBLISH_FREQUENCY = 5000; // Update rate in milliseconds
+
+unsigned long timer;
+
+Ubidots ubidots("BBUS-Rsz8zXqeSRnsp2F0nnSVKEmnfSluKb");
+
+// VARIABLES DONDE GUARDAR LOS VALORES ADC DEl NIVEL DE BATERIA
+int valorBattery;
+
+//Indicadores de Carga y Nivel de voltaje
+const int voltaje=25;
+int valor_pila=0;
+int cargado=23;
+int carga_media=22;
+int descargado=4;
+int activarCarga=2;
+// Variable que guarda la posición de manera estática
+static int posicion = 0; //horizontal 
+static int posicion1 = 0; //vertical 
+// Pines de motor paso a paso
+CheapStepper stepper(5, 18, 19, 21);
+CheapStepper stepper1(13, 12, 14, 27);
+
+// LDRS
+const int luzUPLEFT = 34;
+const int luzUPRIGHT = 35;
+const int luzDOWNLEFT=32;
+const int luzDOWMRIGHT=33;
+// VARIABLES DONDE GUARDAR LOS VALORES ADC DE LOS LDR
+int valorLdrUPLEFT;
+int valorLdrUPRIGHT;
+int valorLdrDOWMLEFT;
+int valorLdrDOWMRIGHT;
+// Variable que guarda el sentido de giro
+boolean moveClockwise = true;
+boolean moveClockwise1 = true;
+
+
+void TestHwm(char *taskName);
+void TaskWifiDate(void *pvParameters);
+void TaskSolarTracker(void *pvParameters);
+void TaskBattery(void *pvParameters);
+
+void setup() {
+  //Conexión wifi
+  // ubidots.setDebug(true);  // uncomment this to make debug messages available
+  ubidots.connectToWifi(WIFISSID, PASSWORD);
+  ubidots.setup();
+  ubidots.reconnect();
+
+  timer = millis();
+   //Solar Tracker
+  stepper.setRpm(10);// colocamos las rpm para el motoro de paso a paso
+  stepper.moveTo(moveClockwise, 0); //define la posición inicial de los motores al iniciar la esp32
+  stepper1.setRpm(10);
+  stepper1.moveTo(moveClockwise, 0);
+  delay(1000);
+  //Indicadores de Carga 
+  pinMode(voltaje, INPUT);
+  pinMode(cargado, OUTPUT);
+  pinMode(carga_media, OUTPUT);
+  pinMode(descargado, OUTPUT);
+  pinMode(activarCarga, OUTPUT);
+  xTaskCreatePinnedToCore(TaskWifiDate, "TaskWifiDate",4096,NULL,1,NULL,APP_CPU);
+  xTaskCreatePinnedToCore(TaskSolarTracker, "SolarTracker",4096,NULL,1,NULL,APP_CPU);
+  xTaskCreatePinnedToCore(TaskBattery, "TaskBattery",4096,NULL,1,NULL,APP_CPU);
+  //Modo Ahorro de Energía de la esp32
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_34,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_35,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_32,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_25,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_22,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_23,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_4,0);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2,0);
+
+  esp_deep_sleep_start();
+}
+void loop() {}
+
+void TaskWifiDate(void *pvParameters){
+  (void) pvParameters;
+  if (!ubidots.connected()){
+    ubidots.reconnect();
+  }
+  valorBattery = analogRead(voltaje);
+  valorBattery = valorBattery*0.025; // PARA OBTENER LOS VALORES DEL 0 AL 100
+  // Se coloca limite superior igual a 100
+  if(voltaje>100){
+    valorBattery = 100;
+  }
+  ubidots.add(VARIABLE_LABEL, valorBattery); // Insert your variable Labels and the value to be sent
+  ubidots.publish(DEVICE_LABEL);
+  timer = millis();
+  delay(1000);
+}
+
+void TaskSolarTracker(void *pvParameters){
+  (void) pvParameters;
+  // GUARDAMOS LOS VALORES OBTENIDOS POR LOS LDR EN SUS RESPECTIVAS VARIABLES
+  valorLdrUPLEFT = analogRead(luzUPLEFT);
+  valorLdrUPRIGHT = analogRead(luzUPRIGHT);
+  valorLdrDOWMLEFT=analogRead(luzDOWNLEFT);
+  valorLdrDOWMRIGHT=analogRead(luzDOWMRIGHT);
+  delay(1000);
+  if (posicion >= 0 && posicion < 180 && valorLdrUPLEFT > 2000)
+  {
+    moveClockwise = true;
+    stepper.moveDegrees(moveClockwise, 20);
+    posicion = posicion + 20;
+   
+  }
+  if (posicion <= 180 && posicion > 0 && valorLdrUPRIGHT > 2000)
+  {
+    moveClockwise = true;
+    stepper.moveDegrees(moveClockwise, 20);
+    posicion = posicion - 20;
+ 
+  }
+  if (posicion1 >= 0 && posicion1 < 180 && valorLdrDOWMLEFT > 2000)
+  {
+    moveClockwise1 = false;
+    stepper1.moveDegrees(moveClockwise1, 20);
+    posicion1 = posicion1 + 20;
+  }
+  if (posicion1 <= 180 && posicion1 > 0 && valorLdrDOWMRIGHT > 3900)
+  {
+    moveClockwise1 = false;
+    stepper1.moveDegrees(moveClockwise1, 20);
+    posicion1 = posicion1 - 20;
+  }
+}
+void TaskBattery(void *pvParameters){
+  (void) pvParameters;
+
+  valor_pila=analogRead(voltaje);
+  Serial.println(valor_pila);
+  delay(1000); // this speeds up the simulation
+  if (valor_pila>2000)// los valores con los que se establece la condición pueden ser modificados a conveniencia 
+{  
+    digitalWrite(23, LOW);
+    digitalWrite(22, LOW);
+    digitalWrite(4, HIGH);
+    delay(10);
+  }
+  if (valor_pila<2000 && valor_pila >1500){
+    digitalWrite(23, LOW);
+    digitalWrite(22, LOW);
+    digitalWrite(4, HIGH);
+    delay(10);
+  }
+  if (valor_pila<1000){
+    digitalWrite(23, LOW);
+    digitalWrite(22, LOW);
+    digitalWrite(4, HIGH);
+    delay(10);
+  }
+  while(valor_pila<1000 && valor_pila<2000){
+      digitalWrite(activarCarga,HIGH);
+      delay(10);
+}
+}
