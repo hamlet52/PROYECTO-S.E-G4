@@ -1,8 +1,9 @@
 #include <Arduino.h>
 #include <CheapStepper.h> //SE DEBE AÑADIR ESTA LIBRERIA
 
-// Definimos variables para saber la posición del motor
-
+// Variable que guarda la posición de manera estática
+static int posicion = 0; //horizontal 
+static int posicion1 = 0; //vertical 
 // Pines de motor paso a paso
 CheapStepper stepper(5, 18, 19, 21);
 CheapStepper stepper1(13, 12, 14, 27);
@@ -21,16 +22,14 @@ int valorLdrDOWMRIGHT;
 boolean moveClockwise = true;
 boolean moveClockwise1 = true;
 
-// Variable que guarda la posición de manera estática
-static int posicion = 0;
-static int posicion1 = 0;
-static int ultimo_valor;
+
+
 
 void setup()
 {
   Serial.begin(9600);
-  stepper.setRpm(10);
-  stepper.moveTo(moveClockwise, 0);
+  stepper.setRpm(10);// colocamos las rpm para el motoro de paso a paso
+  stepper.moveTo(moveClockwise, 0); //define la posición inicial de los motores al iniciar la esp32
   stepper1.setRpm(10);
   stepper1.moveTo(moveClockwise, 0);
   delay(1000);
@@ -45,21 +44,21 @@ void loop()
   valorLdrDOWMLEFT=analogRead(luzDOWNLEFT);
   valorLdrDOWMRIGHT=analogRead(luzDOWMRIGHT);
   delay(1000);
-  if (posicion >= 0 && posicion < 180 && valorLdrUPLEFT > 3900)
+  if (posicion >= 0 && posicion < 180 && valorLdrUPLEFT > 2000)
   {
     moveClockwise = true;
     stepper.moveDegrees(moveClockwise, 20);
     posicion = posicion + 20;
-    ultimo_valor=posicion;
+   
   }
-  if (posicion <= 180 && posicion > 0 && valorLdrUPRIGHT > 3900)
+  if (posicion <= 180 && posicion > 0 && valorLdrUPRIGHT > 2000)
   {
     moveClockwise = true;
     stepper.moveDegrees(moveClockwise, 20);
     posicion = posicion - 20;
-    ultimo_valor=posicion;
+ 
   }
-  if (posicion1 >= 0 && posicion1 < 180 && valorLdrDOWMLEFT > 3900)
+  if (posicion1 >= 0 && posicion1 < 180 && valorLdrDOWMLEFT > 2000)
   {
     moveClockwise1 = false;
     stepper1.moveDegrees(moveClockwise1, 20);
@@ -71,9 +70,4 @@ void loop()
     stepper1.moveDegrees(moveClockwise1, 20);
     posicion1 = posicion1 - 20;
   }
-
-  Serial.println(ultimo_valor);
-  delay(1000);
-  //Serial.println(posicion1);
-  //delay(1000);
 }
