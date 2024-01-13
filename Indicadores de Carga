@@ -12,6 +12,7 @@ void setup() {
   pinMode(cargado, OUTPUT);
   pinMode(carga_media, OUTPUT);
   pinMode(descargado, OUTPUT);
+  pinMode(activarCarga, OUTPUT);
 
 }
 
