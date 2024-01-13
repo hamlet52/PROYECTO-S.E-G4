@@ -40,7 +40,7 @@ void loop()
   valorBattery = analogRead(batteryLevel);
   valorBattery = valorBattery*0.025; // PARA OBTENER LOS VALORES DEL 0 AL 100
   // Se coloca limite superior igual a 100
-  if(valorBatteryT>100){
+  if(valorBattery>100){
     valorBattery = 100;
   }
   ubidots.add(VARIABLE_LABEL, valorBattery); // Insert your variable Labels and the value to be sent
